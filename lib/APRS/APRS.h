@@ -15,7 +15,7 @@
 #include <stdint.h>
 #include <string>
 #include <SoftwareSerial.h>
-#include "DRA818V.h"
+#include "dra818v.h"
 #include "afsk.h"
 
 static const uint8_t MAX_SSIDS = 4;
