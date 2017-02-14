@@ -7,54 +7,44 @@ static const int SOFT_SERIAL_BAUD = 9600;
 static const int SERIAL_BAUD = 9600;
 static const bool CHANNEL_SCAN_BW = true; //true: 25kHz, false: 12.5kHz
 
-DRA818V::DRA818V()
-{
-    sleepPin = DRA_SLEEP;
-    pttPin = DRA_PTT;
-    radio_enable = DRA_ENABLE;
-    radio_power = DRA_PWR;
-    micPin = DRA_MIC;
-    radioSerial = new SoftwareSerial(DRA_TX,DRA_RX);
-}
-
 bool DRA818V::init() {
-    pinMode(pttPin,OUTPUT);
-    pinMode(radio_enable,OUTPUT);
-    pinMode(micPin,OUTPUT);
-    digitalWrite(radio_enable,LOW);
-    pinMode(sleepPin,OUTPUT);
-    digitalWrite(DRA_SLEEP,HIGH);
-    radioSerial->begin(SOFT_SERIAL_BAUD);
+    pinMode(_pttPin,OUTPUT);
+    pinMode(_radio_enable,OUTPUT);
+    pinMode(_micPin,OUTPUT);
+    digitalWrite(_radio_enable,LOW);
+    pinMode(_sleepPin,OUTPUT);
+    digitalWrite(_sleepPin,HIGH);
+    radioSerial.begin(SOFT_SERIAL_BAUD);
     if(!Serial) {
         Serial.begin(SOFT_SERIAL_BAUD);
     }
-    digitalWrite(pttPin,LOW);
+    digitalWrite(_pttPin,LOW);
     delay(200);
-    radioSerial->print("AT+DMOCONNECT\r\n");
-    digitalWrite(pttPin,HIGH);
+    radioSerial.print("AT+DMOCONNECT\r\n");
+    digitalWrite(_pttPin,HIGH);
     delay(200);
-    digitalWrite(pttPin,LOW);
+    digitalWrite(_pttPin,LOW);
     delay(200);
     configSettings();
     return true;
 }
 
 void DRA818V::configSettings() {
-    digitalWrite(pttPin,LOW);
-    radioSerial->print("AT+DMOSETGROUP=");
-    radioSerial->print(CHANNEL_SCAN_BW,1);
-    radioSerial->print(",");
-    radioSerial->print(APRS_NA_FTX,4);
-    radioSerial->print(",");
-    radioSerial->print(APRS_NA_FRX,4);
-    radioSerial->print(",");
-    radioSerial->print(TX_CTCSS);
-    radioSerial->print(",");
-    radioSerial->print(squelch);
-    radioSerial->print(",");
-    radioSerial->print(RX_CTCSS);
-    radioSerial->print("\r\n");
+    digitalWrite(_pttPin,LOW);
+    radioSerial.print("AT+DMOSETGROUP=");
+    radioSerial.print(CHANNEL_SCAN_BW,1);
+    radioSerial.print(",");
+    radioSerial.print(APRS_NA_FTX,4);
+    radioSerial.print(",");
+    radioSerial.print(APRS_NA_FRX,4);
+    radioSerial.print(",");
+    radioSerial.print(TX_CTCSS);
+    radioSerial.print(",");
+    radioSerial.print(squelch);
+    radioSerial.print(",");
+    radioSerial.print(RX_CTCSS);
+    radioSerial.print("\r\n");
     delay(500);
-    digitalWrite(pttPin,HIGH);
+    digitalWrite(_pttPin,HIGH);
     delay(200);
 }

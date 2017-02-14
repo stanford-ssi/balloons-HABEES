@@ -31,7 +31,8 @@ public:
     gpsModule(GPS_ENABLE, GPS_BAUD, GPS_LOCK_TIME),
     canModule(CAN_ENABLE, CAN_BAUD),
     RBModule(RB_SLEEP, RB_BAUD),
-    radioModule() {
+    radioModule(DRA_TX,DRA_RX,DRA_PTT,DRA_MIC, DRA_ENABLE, DRA_PWR, DRA_SLEEP, \
+                TARGET_CALLSIGN, TARGET_DESIG, TX_CALLSIGN, MISSION_NUMBER) {
   }
   void    init();
 /********************************  FUNCTIONS  *********************************/

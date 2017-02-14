@@ -14,15 +14,15 @@
 #include <Arduino.h>
 #include <stdint.h>
 #include <string>
-#include "afsk.h"
 #include <SoftwareSerial.h>
-/**********************************  TODO  ************************************/
-#include "../../src/Config.h"
-/**********************************  TODO  ************************************/
+#include "DRA818V.h"
+#include "afsk.h"
+
+static const uint8_t MAX_SSIDS = 4;
+static const int MAX_PACKET_SIZE = 512; //bytes
 
 using namespace std;
 
-class DRA818V;
 struct SSID {
     const char* address;
     uint8_t ssid_designator;
@@ -32,8 +32,16 @@ class APRS
 {
 public:
 /**********************************  SETUP  ***********************************/
-    APRS();
-    void    setSSIDs();
+    APRS(uint8_t tx, uint8_t rx, uint8_t pttPin, uint8_t micPin, \
+          uint8_t  radio_enable, uint8_t radio_power,uint8_t sleepPin, \
+          const char* targ_callsign, uint8_t targ_desig, const char* own_callsign, \
+          const char* comment):
+       radio(tx,rx,pttPin,micPin,radio_enable,radio_power,sleepPin){
+         _targ_callsign = targ_callsign;
+         _targ_desig = targ_desig;
+         _own_callsign = own_callsign;
+         _comment = comment;
+    }
     bool    init();
 /********************************  FUNCTIONS  *********************************/
     int16_t sendAdditionalData(char* extData, uint16_t len);
@@ -42,6 +50,7 @@ public:
     void    sendPacketNoGPS(char* data);
     int     getPacketSize();
     void    clearPacket();
+    void    setSSIDs();
 private:
 /*********************************  HELPERS  **********************************/
     void    loadHeader();
@@ -56,49 +65,14 @@ private:
     void    loadHDLCFlag();
     void    update_crc(uint8_t bit);
 /*********************************  OBJECTS  **********************************/
-    static const uint16_t  BUFFER_SIZE = 200;
-
-/**********************************  TODO  ************************************/
-    // uint8_t   DRA_ENABLE         =       A0;
-    // uint8_t   DRA_SLEEP          =      A18;
-    // uint8_t   DRA_PWR            =       A3;
-    // uint8_t   DRA_TX             =      A16;
-    // uint8_t   DRA_RX             =      A17;
-    // uint8_t   DRA_MIC            =      A14;
-    // uint8_t   DRA_PTT            =       A2;
-
-    // uint16_t  ANALOG_RES         =       12;
-    // uint16_t  ANALOG_MAX         =     4095;
-    // char      MISSION_NUMBER[50];
-    // char      TARGET_CALLSIGN[50];
-    // char      TX_CALLSIGN[50];
-    // char      DEFAULT_PATH[50];
-    // uint8_t   MAX_EXTRA_DATA     =      100;
-    // uint8_t   TARGET_DESIG       =        0;
-    // uint8_t   TX_DESIG           =       11;
-    // uint8_t   PATH_DESIG         =        1;
-/**********************************  TODO  ************************************/
-
-    DRA818V* radio;
-    SSID* ssids;
+    DRA818V radio;
+    SSID ssids[MAX_SSIDS];
     uint8_t num_ssids;
-    volatile uint8_t* packet_buffer;
+    const char* _targ_callsign;
+    uint8_t _targ_desig;
+    const char* _own_callsign;
+    const char* _comment;
+    volatile uint8_t packet_buffer[MAX_PACKET_SIZE];
     int packet_size;
-
-    static const uint8_t HDLC_FLAG = 0x7E;
-    uint8_t NUM_HDLC_FLAGS = 50; //default number
-    uint8_t NUM_SSIDS = 3; //default number
-    static const uint8_t MAX_SSIDS = 4;
-    bool USE_WIDE2_2 = false;
-    static const int MAX_BUFFER_SIZE = 512; //bytes
-    static const uint8_t BIT_STUFF_THRESHOLD = 5; //APRS protocol
-
-    uint16_t crc = 0;
-    uint8_t consecutiveOnes = 0;
-    uint8_t bitMask= B00000000;
-    uint8_t bitPos = 8;
-
-    char extraData[BUFFER_SIZE];
-    int16_t extraLen = 0;
 };
 #endif // APRS_H

@@ -11,14 +11,31 @@
 
 #include "APRS.h"
 
+static const uint8_t HDLC_FLAG = 0x7E;
+uint8_t NUM_HDLC_FLAGS = 50; //default number
+uint8_t NUM_SSIDS = 3; //default number
+
+bool USE_WIDE2_2 = false;
+static const int DATA_SIZE = 256; //bytes
+static const int EXT_DATA_SIZE = 256;
+static const uint8_t BIT_STUFF_THRESHOLD = 5; //APRS protocol
+
+uint16_t crc = 0;
+uint8_t consecutiveOnes = 0;
+uint8_t bitMask= B00000000;
+uint8_t bitPos = 8;
+
+char extraData[DATA_SIZE];
+int16_t extraLen = 0;
+static const uint8_t   TX_DESIG           =       11; //designator for balloons
+static const char      DEFAULT_PATH[]     =  "WIDE1";
+static const uint8_t   DEFAULT_PATH_DESIG =        1;
+static const char      EXT_PATH[]         =  "WIDE2";
+static const uint8_t   EXT_PATH_DESIG     =        2;
+
 /**********************************  SETUP  ***********************************/
 void latToStr(char * const s, const int size, float lat);
 void lonToStr(char * const s, const int size, float lon);
-APRS::APRS() {
-   packet_buffer = new uint8_t[MAX_BUFFER_SIZE]();
-   packet_size = 0;
-   ssids = new SSID[MAX_SSIDS];
-}
 
 /*
   function: init
@@ -26,10 +43,9 @@ APRS::APRS() {
   This function initializes the APRS module.
 */
 bool APRS::init() {
-    radio = new DRA818V();
-    setSSIDs();
     packet_size = 0;
-    if(radio->init()) {
+    setSSIDs();
+    if(radio.init()) {
         return true;
     }
     return false;
@@ -74,7 +90,7 @@ int16_t APRS::sendPacket(char* time, float lat, float lon, float altitude, uint1
     snprintf(temp, sizeof(temp), "%06ld", (long) (altitude / 0.3048)); // 10000 ft = 3048 m
     APRS::loadString(temp);
     APRS::loadString(extraData,extraLen);
-    APRS::loadString(MISSION_NUMBER);
+    APRS::loadString(_comment);
     APRS::loadFooter();
     APRS::loadTrailingBits(bitPos);//load the trailing bits that might exist due to bitstuffing
     if(debug) {
@@ -82,7 +98,7 @@ int16_t APRS::sendPacket(char* time, float lat, float lon, float altitude, uint1
         Serial.print(APRS::getPacketSize()/8);
         Serial.println("bytes");
     }
-    afsk_modulate_packet(packet_buffer, APRS::getPacketSize(),(8-bitPos));
+    afsk_modulate_packet(radio._pttPin, radio._micPin, packet_buffer, APRS::getPacketSize(),(8-bitPos));
     return 0;
 }
 
@@ -93,11 +109,10 @@ void APRS::sendPacketNoGPS(char* data) {
     bitPos = 8;
     APRS::clearPacket();
     APRS::loadHeader();
-
     APRS::loadString(data);
     APRS::loadFooter();
     APRS::loadTrailingBits(bitPos);//load the trailing bits that might exist due to bitstuffing
-    afsk_modulate_packet(packet_buffer, APRS::getPacketSize(),(8-bitPos));
+    afsk_modulate_packet(radio._pttPin, radio._micPin, packet_buffer, APRS::getPacketSize(),(8-bitPos));
 }
 
 void APRS::clearPacket() {
@@ -106,18 +121,18 @@ void APRS::clearPacket() {
 
 void APRS::setSSIDs() {
     num_ssids = NUM_SSIDS;
-    ssids[0].address = TARGET_CALLSIGN;
-    ssids[0].ssid_designator = TARGET_DESIG;
-    ssids[1].address = TX_CALLSIGN;
+    ssids[0].address = _targ_callsign;
+    ssids[0].ssid_designator = _targ_desig;
+    ssids[1].address = _own_callsign;
     ssids[1].ssid_designator = TX_DESIG;
     ssids[2].address = DEFAULT_PATH;
-    ssids[2].ssid_designator = PATH_DESIG;
-    ssids[3].address = "WIDE2";
-    ssids[3].ssid_designator = 2;
+    ssids[2].ssid_designator = DEFAULT_PATH_DESIG;
+    ssids[3].address = EXT_PATH;
+    ssids[3].ssid_designator = EXT_PATH_DESIG;
 }
 
 int16_t APRS::sendAdditionalData(char* extData, uint16_t len) {
-  if(len > BUFFER_SIZE) return -1;
+  if(len > EXT_DATA_SIZE) return -1;
   if(len < 0) return -1;
   for(int i = 0; i < len; i++) {
     extraData[i] = extData[i];
@@ -198,7 +213,7 @@ void APRS::loadTrailingBits(uint8_t bitIndex) {
 }
 
 void APRS::loadBit(uint8_t bit, bool bitStuff) {
-    if(packet_size >= 8*MAX_BUFFER_SIZE) return;
+    if(packet_size >= 8*MAX_PACKET_SIZE) return;
 //    Serial.println(bit);
 //    Serial.println(bitPos);
     if (bitStuff) {

@@ -1,10 +1,10 @@
 #ifndef AFSK_H
 #define AFSK_H
-#include "APRS.h"
-#include <dra818v.h>
+#include "Arduino.h"
+
 // Exported functions
 
-void afsk_modulate_packet(volatile uint8_t* buffer, int size, int trailingBits);
+void afsk_modulate_packet(uint8_t pttPin, uint8_t micPin, volatile uint8_t* buffer, int size, int trailingBits);
 void afsk_timer_begin();
 void afsk_timer_stop();
 void resetVolatiles();

@@ -45,11 +45,7 @@ static const double    PID_SETPOINT       =        0;
 
 static const char      TARGET_CALLSIGN[]  =   "APRS";
 static const char      TX_CALLSIGN[]      = "KM6HBK";
-static const char      DEFAULT_PATH[]     =  "WIDE2";
-static const uint8_t   MAX_EXTRA_DATA     =      100;
 static const uint8_t   TARGET_DESIG       =        0;
-static const uint8_t   TX_DESIG           =       11;
-static const uint8_t   PATH_DESIG         =        1;
 
 /*****************************  TEENSY PIN OUTS  ******************************/
 static const uint8_t   SD_CS              =       21;

@@ -1,5 +1,8 @@
 #include "afsk.h"
-
+//Configured Instance variables
+//Pin numbers and the like from configuration
+uint8_t mic = 0;
+uint8_t ptt = 0;
 //Frequency Constants
 static const int MARK_FREQ = 1200;
 static const int SPACE_FREQ = 2200;
@@ -56,16 +59,18 @@ uint16_t sineLookup(const int currentPhase) {
     return analogOut;
 }
 
-void afsk_modulate_packet(volatile uint8_t *buffer, int size, int trailingBits) {
+void afsk_modulate_packet(uint8_t pttPin, uint8_t micPin, volatile uint8_t *buffer, int size, int trailingBits) {
     packet = buffer;
     packet_size = size;
+    mic = micPin;
+    ptt = pttPin;
     afsk_timer_begin();
 }
 
 void afsk_timer_begin() {
     interruptTimer.begin(radioISR,(float)1E6/(SAMPLE_RATE));
     resetVolatiles();
-    digitalWrite(DRA_PTT,LOW);
+    digitalWrite(ptt,LOW);
     delay(PTT_DELAY);//todo: change this to match DRA object's delay
     txing = true;
 }
@@ -90,8 +95,8 @@ void radioISR() {
     if(bitIndex == 0) {
         if(packetIndex >= packet_size) {
             txing = false;
-            analogWrite(DRA_MIC,ANALOG_MAX/2);
-            digitalWrite(DRA_PTT,HIGH);
+            analogWrite(mic,2047);
+            digitalWrite(ptt,HIGH);
             afsk_timer_stop();
             return;
         } else if (byteIndex== 0) {
@@ -120,5 +125,5 @@ void radioISR() {
     if(freq == MARK_FREQ) {
         analogOut = analogOut*PREEMPHASIS_RATIO;
     }
-    analogWrite(DRA_MIC, analogOut);
+    analogWrite(mic, analogOut);
 }
