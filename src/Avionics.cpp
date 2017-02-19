@@ -22,6 +22,7 @@ void Avionics::init() {
   watchdog();
   printHeader();
   if(!SD.begin(SD_CS)) PCB.faultLED();
+  setupLog();
   logHeader();
   if(!sensors.init())     logAlert("unable to initialize Sensors", true);
   if(!gpsModule.init())   logAlert("unable to initialize GPS", true);
@@ -318,20 +319,44 @@ void Avionics::printHeader() {
 }
 
 /*
+ * Function: setupLog
+ * -------------------
+ * This function initializes the SD card file.
+ */
+void Avionics::setupLog() {
+  Serial.println("Card Initialitzed");
+  char filename[] = "LOGGER00.CSV";
+  for (uint8_t i = 0; i < 100; i++) {
+    filename[6] = i / 10 + '0';
+    filename[7] = i % 10 + '0';
+    if (! SD.exists(filename)) {
+      dataFile = SD.open(filename, FILE_WRITE);
+      break;
+    }
+  }
+  logFile = SD.open("log.txt", FILE_WRITE);
+  if (!dataFile || !logFile) {
+    PCB.faultLED();
+    Serial.println ("ERROR: COULD NOT CREATE FILE");
+  }
+  else {
+    Serial.print("Logging to: ");
+    Serial.println(filename);
+  }
+}
+
+/*
  * Function: logHeader
  * -------------------
  * This function logs the CSV header.
  */
 void Avionics::logHeader() {
-  dataFile = SD.open("data.txt", FILE_WRITE);
-  if(!dataFile) PCB.faultLED();
   dataFile.print("Stanford Student Space Initiative Balloons Launch ");
   dataFile.print(MISSION_NUMBER);
   dataFile.print('\n');
   dataFile.print(CSV_DATA_HEADER);
   dataFile.print('\n');
   dataFile.flush();
-  dataFile.close();
 }
 
 /*
@@ -341,16 +366,14 @@ void Avionics::logHeader() {
  */
 void Avionics::logAlert(const char* debug, bool fatal) {
   if(fatal) PCB.faultLED();
-  dataFile = SD.open("log.txt", FILE_WRITE);
-  if(dataFile) {
-    dataFile.print(data.TIME);
-    dataFile.print(',');
-    if(fatal) dataFile.print("FATAL ERROR!!!!!!!!!!: ");
-    else dataFile.print("Alert: ");
-    dataFile.print(debug);
-    dataFile.print("...\n");
-    dataFile.flush();
-    dataFile.close();
+  if(logFile) {
+    logFile.print(data.TIME);
+    logFile.print(',');
+    if(fatal) logFile.print("FATAL ERROR!!!!!!!!!!: ");
+    else logFile.print("Alert: ");
+    logFile.print(debug);
+    logFile.print("...\n");
+    logFile.flush();
   }
   if(data.DEBUG_STATE) {
     Serial.print(data.TIME);
@@ -421,8 +444,6 @@ void Avionics::printState() {
  * This function logs the current data frame.
  */
 bool Avionics::logData() {
-  dataFile = SD.open("data.txt", FILE_WRITE);
-  if(!dataFile) return false;
   dataFile.print(data.TIME);
   dataFile.print(',');
   dataFile.print(data.LOOP_RATE);
@@ -458,7 +479,6 @@ bool Avionics::logData() {
   dataFile.print(data.CUTDOWN_STATE);
   dataFile.print('\n');
   dataFile.flush();
-  dataFile.close();
   return true;
 }
 

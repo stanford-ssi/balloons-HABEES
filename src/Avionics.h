@@ -61,6 +61,7 @@ private:
   void    calcAscent();
   void    displayState();
   void    printHeader();
+  void    setupLog();
   void    logHeader();
   void    logAlert(const char*, bool fatal);
   void    watchdog();
@@ -71,6 +72,7 @@ private:
   char COMMS_BUFFER[BUFFER_SIZE];
   DataFrame data;
   File dataFile;
+  File logFile;
   Hardware PCB;
   Sensors sensors;
   GPS gpsModule;
