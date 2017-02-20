@@ -19,9 +19,9 @@
 class CAN {
 public:
 /**********************************  SETUP  ***********************************/
-  CAN(uint8_t CAN_ENABLE_PIN, uint32_t CAN_BAUD_VAL) :
-    CAN_ENABLE(CAN_ENABLE_PIN),
-    CANbus(CAN_BAUD_VAL) {
+  CAN(uint8_t CAN_EanablePin, uint32_t CAN_BaudVal) :
+    CAN_ENABLE_PIN(CAN_EanablePin),
+    CANbus(CAN_BaudVal) {
   }
   bool    init();
 /********************************  FUNCTIONS  *********************************/
@@ -30,7 +30,7 @@ private:
 /*********************************  OBJECTS  **********************************/
   static const uint16_t BUFFER_SIZE = 200;
   uint8_t crxBuffer[BUFFER_SIZE] = {0};
-  uint8_t CAN_ENABLE;
+  uint8_t CAN_ENABLE_PIN;
   FlexCAN CANbus;
 };
 

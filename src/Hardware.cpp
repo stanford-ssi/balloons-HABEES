@@ -34,14 +34,14 @@ void Hardware::init() {
   ---------------------------------
   This function sets a pin to green or red.
 */
-void Hardware::writeLED(uint8_t PIN, bool green) {
+void Hardware::writeLED(uint8_t pinNum, bool green) {
   if (green) {
-    mcp.digitalWrite(PIN, HIGH);
-    mcp.digitalWrite(15 - PIN, LOW);
+    mcp.digitalWrite(pinNum, HIGH);
+    mcp.digitalWrite(15 - pinNum, LOW);
   }
  else {
-    mcp.digitalWrite(PIN, LOW);
-    mcp.digitalWrite(15 - PIN, HIGH);
+    mcp.digitalWrite(pinNum, LOW);
+    mcp.digitalWrite(15 - pinNum, HIGH);
   }
 }
 

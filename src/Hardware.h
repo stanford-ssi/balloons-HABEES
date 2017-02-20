@@ -23,7 +23,7 @@ public:
   }
   void init();
 /********************************  FUNCTIONS  *********************************/
-  void writeLED(uint8_t PIN, bool green);
+  void writeLED(uint8_t pinNum, bool green);
   void faultLED();
   void heater(double temp);
   void cutDown(bool on);

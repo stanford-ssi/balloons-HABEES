@@ -17,9 +17,9 @@
 class RockBLOCK {
 public:
 /**********************************  SETUP  ***********************************/
-  RockBLOCK(uint8_t RB_SLEEP_PIN, uint16_t RB_BAUD_VAL) :
-    isbd(Serial3, RB_SLEEP_PIN),
-    RB_BAUD(RB_BAUD_VAL) {
+  RockBLOCK(uint8_t RB_SleepPinNum, uint16_t RB_BaudVal) :
+    isbd(Serial3, RB_SleepPinNum),
+    RB_BAUD(RB_BaudVal) {
   }
   bool    init();
 /********************************  FUNCTIONS  *********************************/

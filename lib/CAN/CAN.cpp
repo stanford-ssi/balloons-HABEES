@@ -19,8 +19,8 @@
   This function initializes the CAN bus.
 */
 bool CAN::init() {
-  pinMode(CAN_ENABLE, OUTPUT);
-  analogWrite(CAN_ENABLE, 0);
+  pinMode(CAN_ENABLE_PIN, OUTPUT);
+  analogWrite(CAN_ENABLE_PIN, 0);
   CANbus.begin();
   delay(1000);
   return true;
