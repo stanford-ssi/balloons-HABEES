@@ -50,10 +50,11 @@ private:
   Adafruit_INA219 inaRadio;
   Adafruit_INA219 inaCutdown;
   Adafruit_INA219 inaHeater;
-  float    ASCENT_BUFFER[BUFFER_SIZE];
-  double   ALTITUDE_CURR;
-  double   ALTITUDE_LAST;
-  uint64_t ASCENT_RATE_LAST;
+  float    ASCENT_RATE_BUFFER[BUFFER_SIZE];
+  uint16_t ascentRateIndex = 0;
+  double   altitudeCurr;
+  double   altitudeLast;
+  uint64_t ascentRateLast;
 
 };
 
