@@ -86,7 +86,7 @@ void Avionics::logState() {
 void Avionics::sendComms() {
   if((millis() - data.COMMS_LAST) < COMMS_RATE) return;
   if(!sendSATCOMS()) logAlert("unable to communicate over RB", true);
-  if(!sendAPRS()) logAlert("unable to communicate over APRS", true);
+  // if(!sendAPRS()) logAlert("unable to communicate over APRS", true);
   data.COMMS_LAST = millis();
   watchdog();
 }
