@@ -489,91 +489,53 @@ bool Avionics::logData() {
  * This function compresses the data frame into a bit stream.
  */
 int16_t Avionics::compressData() {
-  int16_t length = 0;
-  size_t varSize = sizeof(data.TIME);
-  for(uint16_t i = 0; i < varSize; i++) {
+  int32_t lengthBits = 0;
+  for(uint16_t i = 0; i < BUFFER_SIZE; i++) COMMS_BUFFER[i] = 0;
+  for(uint16_t i = 0; i < sizeof(data.TIME); i++) {
     COMMS_BUFFER[i] = data.TIME[i];
-    length++;
+    lengthBits += 8;
   }
-  COMMS_BUFFER[length] = ','; length++;
-  varSize = sizeof(data.LOOP_RATE);
-  memcpy(COMMS_BUFFER + length, &data.LOOP_RATE, varSize);
-  length += varSize;
-  COMMS_BUFFER[length] = ','; length++;
+  lengthBits += compressVariable(float(data.LOOP_RATE),      0,    1000000, 19, lengthBits);
+  lengthBits += compressVariable(float(data.VOLTAGE),        0,    5,       9,  lengthBits);
+  lengthBits += compressVariable(float(data.CURRENT),        0,    5000,    8,  lengthBits);
+  lengthBits += compressVariable(float(data.ALTITUDE_BMP),  -2000, 40000,   16, lengthBits);
+  lengthBits += compressVariable(float(data.ASCENT_RATE),   -10,   10,      11, lengthBits);
+  lengthBits += compressVariable(float(data.TEMP_IN),       -50,   100,     9,  lengthBits);
+  lengthBits += compressVariable(float(data.TEMP_EXT),      -100,  100,     9,  lengthBits);
+  lengthBits += compressVariable(float(data.LAT_GPS),       -90,   90,      21, lengthBits);
+  lengthBits += compressVariable(float(data.LONG_GPS),      -180,  180,     22, lengthBits);
+  lengthBits += compressVariable(float(data.SPEED_GPS),     -100,  100,     9,  lengthBits);
+  lengthBits += compressVariable(float(data.HEADING_GPS),   -2000, 40000,   16, lengthBits);
+  lengthBits += compressVariable(float(data.ALTITUDE_GPS),  -2000, 40000,   16, lengthBits);
+  lengthBits += compressVariable(float(data.PRESS_BMP),      0,    1000000, 19, lengthBits);
+  lengthBits += compressVariable(float(data.NUM_SATS_GPS),   0,    10,      11, lengthBits);
+  lengthBits += compressVariable(float(data.RB_SENT_COMMS),  0,    1000000, 19, lengthBits);
+  lengthBits += compressVariable(float(data.CUTDOWN_STATE),  0,    1,       1,  lengthBits);
+  if(lengthBits <= 0) return -1;
+  lengthBits += 8 - (lengthBits % 8);
+  return lengthBits  / 8;
+}
 
-  varSize = sizeof(data.VOLTAGE);
-  memcpy(COMMS_BUFFER + length, &data.VOLTAGE, varSize);
-  length += varSize;
-  COMMS_BUFFER[length] = ','; length++;
+/*
+ * Function: compressVariable
+ * -------------------
+ * This function compresses a single variable into a scaled digital bitmask.
+ */
+int16_t Avionics::compressVariable(float var, float minimum, float maximum, int16_t resolution, int32_t length) {
+  if (var < minimum) var = minimum;
+  if (var > maximum) var = maximum;
+  int32_t adc = round( (pow(2, resolution) - 1) * (var - minimum) / (maximum - minimum));
 
-  varSize = sizeof(data.CURRENT);
-  memcpy(COMMS_BUFFER + length, &data.CURRENT, varSize);
-  length += varSize;
-  COMMS_BUFFER[length] = ','; length++;
-
-  varSize = sizeof(data.ALTITUDE_BMP);
-  memcpy(COMMS_BUFFER + length, &data.ALTITUDE_BMP, varSize);
-  length += varSize;
-  COMMS_BUFFER[length] = ','; length++;
-
-  varSize = sizeof(data.ASCENT_RATE);
-  memcpy(COMMS_BUFFER + length, &data.ASCENT_RATE, varSize);
-  length += varSize;
-  COMMS_BUFFER[length] = ','; length++;
-
-  varSize = sizeof(data.TEMP_IN);
-  memcpy(COMMS_BUFFER + length, &data.TEMP_IN, varSize);
-  length += varSize;
-  COMMS_BUFFER[length] = ','; length++;
-
-  varSize = sizeof(data.TEMP_EXT);
-  memcpy(COMMS_BUFFER + length, &data.TEMP_EXT, varSize);
-  length += varSize;
-  COMMS_BUFFER[length] = ','; length++;
-
-  varSize = sizeof(data.LAT_GPS);
-  memcpy(COMMS_BUFFER + length, &data.LAT_GPS, varSize);
-  length += varSize;
-  COMMS_BUFFER[length] = ','; length++;
-
-  varSize = sizeof(data.LONG_GPS);
-  memcpy(COMMS_BUFFER + length, &data.LONG_GPS, varSize);
-  length += varSize;
-  COMMS_BUFFER[length] = ','; length++;
-
-  varSize = sizeof(data.SPEED_GPS);
-  memcpy(COMMS_BUFFER + length, &data.SPEED_GPS, varSize);
-  length += varSize;
-  COMMS_BUFFER[length] = ','; length++;
-
-  varSize = sizeof(data.HEADING_GPS);
-  memcpy(COMMS_BUFFER + length, &data.HEADING_GPS, varSize);
-  length += varSize;
-  COMMS_BUFFER[length] = ','; length++;
-
-  varSize = sizeof(data.ALTITUDE_GPS);
-  memcpy(COMMS_BUFFER + length, &data.ALTITUDE_GPS, varSize);
-  length += varSize;
-  COMMS_BUFFER[length] = ','; length++;
-
-  varSize = sizeof(data.PRESS_BMP);
-  memcpy(COMMS_BUFFER + length, &data.PRESS_BMP, varSize);
-  length += varSize;
-  COMMS_BUFFER[length] = ','; length++;
-
-  varSize = sizeof(data.NUM_SATS_GPS);
-  memcpy(COMMS_BUFFER + length, &data.NUM_SATS_GPS, varSize);
-  length += varSize;
-  COMMS_BUFFER[length] = ','; length++;
-
-  varSize = sizeof(data.RB_SENT_COMMS);
-  memcpy(COMMS_BUFFER + length, &data.RB_SENT_COMMS, varSize);
-  length += varSize;
-  COMMS_BUFFER[length] = ','; length++;
-
-  varSize = sizeof(data.CUTDOWN_STATE);
-  memcpy(COMMS_BUFFER + length, &data.CUTDOWN_STATE, varSize);
-  length += varSize;
-  data.COMMS_LENGTH = length;
-  return length;
+  int16_t byteIndex = length / 8;
+  int16_t bitIndex = 7 - (length % 8);
+  for (int i = resolution - 1; i >= 0; i--) {
+    bool bit = adc & (1 << i);
+    if (bit) COMMS_BUFFER[byteIndex] |= (1 << bitIndex);
+    bitIndex -= 1;
+    if (bitIndex == 0) {
+      bitIndex = 7;
+      byteIndex++;
+    }
+  }
+  return resolution;
 }

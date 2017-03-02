@@ -68,6 +68,7 @@ private:
   void    printState();
   bool    logData();
   int16_t compressData();
+  int16_t compressVariable(float var, float minimum, float maximum, int16_t resolution, int32_t length);
 /*********************************  OBJECTS  **********************************/
   char COMMS_BUFFER[BUFFER_SIZE];
   DataFrame data;
