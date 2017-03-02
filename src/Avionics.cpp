@@ -72,7 +72,6 @@ void Avionics::actuateState() {
  * This function logs the current data frame.
  */
 void Avionics::logState() {
-  if(compressData() < 0) logAlert("unable to compress Data", true);
   if(!logData())         logAlert("unable to log Data", true);
   // if(!sendCAN())         logAlert("unable to send Data", true);
   watchdog();
@@ -85,6 +84,7 @@ void Avionics::logState() {
  */
 void Avionics::sendComms() {
   if((millis() - data.COMMS_LAST) < COMMS_RATE) return;
+  if(compressData() < 0) logAlert("unable to compress Data", true);
   if(!sendSATCOMS()) logAlert("unable to communicate over RB", true);
   // if(!sendAPRS()) logAlert("unable to communicate over APRS", true);
   data.COMMS_LAST = millis();
