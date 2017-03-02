@@ -1,6 +1,6 @@
 /*
   Stanford Student Space Initiative
-  Balloons | HABEES | February 2017
+  Balloons | HABEES | March 2017
   Davy Ragland | dragland@stanford.edu
 
   File: avionics.h
@@ -46,25 +46,23 @@ public:
 
 private:
 /*********************************  HELPERS  **********************************/
+  void    watchdog();
   bool    readData();
-  bool    calcState();
-  bool    debugState();
   bool    runHeaters();
   bool    runCutdown();
   bool    sendCAN();
   bool    sendSATCOMS();
   bool    sendAPRS();
   void    parseCommand(int16_t len);
-  void    calcVitals();
-  void    calcDebug();
-  void    calcCutdown();
-  void    calcAscent();
+  bool    calcVitals();
+  bool    calcDebug();
+  bool    calcCutdown();
+  bool    debugState();
   void    displayState();
-  void    printHeader();
   void    setupLog();
+  void    printHeader();
   void    logHeader();
   void    logAlert(const char*, bool fatal);
-  void    watchdog();
   void    printState();
   bool    logData();
   int16_t compressData();

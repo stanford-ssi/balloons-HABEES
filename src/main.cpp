@@ -1,8 +1,9 @@
 /*
   Stanford Student Space Initiative
-  Balloons | HABEES | February 2017
+  Balloons | HABEES | March 2017
   Davy Ragland | dragland@stanford.edu
   Aria Tedjarati | satedjarati@stanford.edu
+  Joan Creus-Costa | jcreus@stanford.edu
   Vinh Nguyen | vnguyen5@stanford.edu
 
   File: main.cpp

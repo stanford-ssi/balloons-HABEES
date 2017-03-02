@@ -1,7 +1,8 @@
 /*
   Stanford Student Space Initiative
-  Balloons | HABEES | February 2017
+  Balloons | HABEES | March 2017
   Davy Ragland | dragland@stanford.edu
+  Joan Creus-Costa | jcreus@stanford.edu
 
   File: Avionics.cpp
   --------------------------
@@ -17,8 +18,8 @@
  * This function initializes the avionics flight controller.
  */
 void Avionics::init() {
-  Serial.begin(9600);
   PCB.init();
+  Serial.begin(CONSOLE_BAUD);
   watchdog();
   printHeader();
   if(!SD.begin(SD_CS)) PCB.faultLED();
@@ -50,7 +51,9 @@ void Avionics::updateState() {
  * This function intelligently calculates the current state.
  */
 void Avionics::evaluateState() {
-  if(!calcState())  logAlert("unable to calculate state", true);
+  if(!calcVitals())  logAlert("unable to calculate vitals", true);
+  if(!calcDebug())   logAlert("unable to calculate debug", true);
+  if(!calcCutdown()) logAlert("unable to calculate cutdown", true);
   watchdog();
 }
 
@@ -60,7 +63,6 @@ void Avionics::evaluateState() {
  * This function intelligently reacts to the current data frame.
  */
 void Avionics::actuateState() {
-  if(!debugState()) logAlert("unable to debug state", true);
   if(!runHeaters()) logAlert("unable to run heaters", true);
   if(!runCutdown()) logAlert("unable to run cutdown", true);
   watchdog();
@@ -72,8 +74,9 @@ void Avionics::actuateState() {
  * This function logs the current data frame.
  */
 void Avionics::logState() {
-  if(!logData())         logAlert("unable to log Data", true);
-  // if(!sendCAN())         logAlert("unable to send Data", true);
+  if(!logData())    logAlert("unable to log Data", true);
+  if(!debugState()) logAlert("unable to debug state", true);
+  // if(!sendCAN()) logAlert("unable to send Data", true);
   watchdog();
 }
 
@@ -112,6 +115,17 @@ bool Avionics::finishedSetup() {
 
 /*********************************  HELPERS  **********************************/
 /*
+ * Function: watchdog
+ * -------------------
+ * This function pulses the watchdog IC in order to ensure that avionics recovers from a fatal crash.
+ */
+void Avionics::watchdog() {
+  if((millis() - data.WATCHDOG_LAST) < WATCHDOG_RATE) return;
+  PCB.watchdog();
+  data.WATCHDOG_LAST = millis();
+}
+
+/*
  * Function: readData
  * -------------------
  * This function updates the current data frame.
@@ -135,31 +149,6 @@ bool Avionics::readData() {
   data.HEADING_GPS     = gpsModule.getCourse();
   data.SPEED_GPS       = gpsModule.getSpeed();
   data.NUM_SATS_GPS    = gpsModule.getSats();
-  return true;
-}
-
-/*
- * Function: calcState
- * -------------------
- * This function sets the appropriate values and flags based on the current data frame.
- */
-bool Avionics::calcState() {
-  calcVitals();
-  calcDebug();
-  calcCutdown();
-  return true;
-}
-
-/*
- * Function: debugState
- * -------------------
- * This function provides debuging information.
- */
-bool Avionics::debugState() {
-  if(data.DEBUG_STATE) {
-    displayState();
-    printState();
-  }
   return true;
 }
 
@@ -252,12 +241,13 @@ void Avionics::parseCommand(int16_t len) {
  * -------------------
  * This function calculates if the current state is within bounds.
  */
-void Avionics::calcVitals() {
-  data.BAT_GOOD_STATE    = (data.VOLTAGE >= 3.63);
-  data.CURR_GOOD_STATE   = (data.CURRENT > -5.0 && data.CURRENT <= 500.0);
-  data.PRES_GOOD_STATE   = (data.ALTITUDE_BMP > -50 && data.ALTITUDE_BMP < 200);
-  data.TEMP_GOOD_STATE   = (data.TEMP_IN > 15 && data.TEMP_IN < 50);
-  data.GPS_GOOD_STATE    = (data.LAT_GPS != 1000.0 && data.LAT_GPS != 0.0 && data.LONG_GPS != 1000.0 && data.LONG_GPS != 0.0);
+bool Avionics::calcVitals() {
+  data.BAT_GOOD_STATE  = (data.VOLTAGE >= 3.63);
+  data.CURR_GOOD_STATE = (data.CURRENT > -5.0 && data.CURRENT <= 500.0);
+  data.PRES_GOOD_STATE = (data.ALTITUDE_BMP > -50 && data.ALTITUDE_BMP < 200);
+  data.TEMP_GOOD_STATE = (data.TEMP_IN > 15 && data.TEMP_IN < 50);
+  data.GPS_GOOD_STATE  = (data.LAT_GPS != 1000.0 && data.LAT_GPS != 0.0 && data.LONG_GPS != 1000.0 && data.LONG_GPS != 0.0);
+  return true;
 }
 
 /*
@@ -265,10 +255,11 @@ void Avionics::calcVitals() {
  * -------------------
  * This function calculates if the avionics is in debug mode.
  */
-void Avionics::calcDebug() {
+bool Avionics::calcDebug() {
   if(data.DEBUG_STATE   && (data.ALTITUDE_LAST >= DEBUG_ALT) && (data.ALTITUDE_BMP >= DEBUG_ALT)) {
     data.DEBUG_STATE = false;
   }
+  return true;
 }
 
 /*
@@ -276,7 +267,7 @@ void Avionics::calcDebug() {
  * -------------------
  * This function calculates if the avionics should cutdown.
  */
-void Avionics::calcCutdown() {
+bool Avionics::calcCutdown() {
   if(CUTDOWN_GPS_ENABLE && data.GPS_GOOD_STATE &&
     (((data.LAT_GPS < GPS_FENCE_LAT_MIN) || (data.LAT_GPS > GPS_FENCE_LAT_MAX)) ||
     ((data.LONG_GPS < GPS_FENCE_LON_MIN) || (data.LONG_GPS > GPS_FENCE_LON_MAX)))
@@ -286,6 +277,20 @@ void Avionics::calcCutdown() {
     (data.ALTITUDE_LAST >= CUTDOWN_ALT) &&
     (data.ALTITUDE_BMP  >= CUTDOWN_ALT)
   ) data.SHOULD_CUTDOWN  = true;
+  return true;
+}
+
+/*
+ * Function: debugState
+ * -------------------
+ * This function provides debuging information.
+ */
+bool Avionics::debugState() {
+  if(data.DEBUG_STATE) {
+    displayState();
+    printState();
+  }
+  return true;
 }
 
 /*
@@ -302,20 +307,6 @@ void Avionics::displayState() {
     PCB.writeLED(RB_GOOD_LED,   data.RB_GOOD_STATE);
     PCB.writeLED(GPS_GOOD_LED,  data.GPS_GOOD_STATE);
     PCB.writeLED(LOOP_GOOD_LED, data.LOOP_GOOD_STATE);
-}
-
-/*
- * Function: printHeader
- * -------------------
- * This function prints the CSV header.
- */
-void Avionics::printHeader() {
-  if(!Serial) PCB.faultLED();
-  Serial.print("Stanford Student Space Initiative Balloons Launch ");
-  Serial.print(MISSION_NUMBER);
-  Serial.print('\n');
-  Serial.print(CSV_DATA_HEADER);
-  Serial.print('\n');
 }
 
 /*
@@ -343,6 +334,20 @@ void Avionics::setupLog() {
     Serial.print("Logging to: ");
     Serial.println(filename);
   }
+}
+
+/*
+ * Function: printHeader
+ * -------------------
+ * This function prints the CSV header.
+ */
+void Avionics::printHeader() {
+  if(!Serial) PCB.faultLED();
+  Serial.print("Stanford Student Space Initiative Balloons Launch ");
+  Serial.print(MISSION_NUMBER);
+  Serial.print('\n');
+  Serial.print(CSV_DATA_HEADER);
+  Serial.print('\n');
 }
 
 /*
@@ -383,17 +388,6 @@ void Avionics::logAlert(const char* debug, bool fatal) {
     Serial.print(debug);
     Serial.print("...\n");
   }
-}
-
-/*
- * Function: watchdog
- * -------------------
- * This function pulses the watchdog IC in order to ensure that avionics recovers from a fatal crash.
- */
-void Avionics::watchdog() {
-  if((millis() - data.WATCHDOG_LAST) < WATCHDOG_RATE) return;
-  PCB.watchdog();
-  data.WATCHDOG_LAST = millis();
 }
 
 /*
@@ -526,7 +520,6 @@ int16_t Avionics::compressVariable(float var, float minimum, float maximum, int1
   if (var < minimum) var = minimum;
   if (var > maximum) var = maximum;
   int32_t adc = round( (pow(2, resolution) - 1) * (var - minimum) / (maximum - minimum));
-
   int16_t byteIndex = length / 8;
   int16_t bitIndex = 7 - (length % 8);
   for (int i = resolution - 1; i >= 0; i--) {
