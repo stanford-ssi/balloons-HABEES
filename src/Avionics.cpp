@@ -511,9 +511,10 @@ int16_t Avionics::compressData() {
   lengthBits += compressVariable(float(data.NUM_SATS_GPS),   0,    10,      11, lengthBits);
   lengthBits += compressVariable(float(data.RB_SENT_COMMS),  0,    1000000, 19, lengthBits);
   lengthBits += compressVariable(float(data.CUTDOWN_STATE),  0,    1,       1,  lengthBits);
-  if(lengthBits <= 0) return -1;
   lengthBits += 8 - (lengthBits % 8);
-  return lengthBits  / 8;
+  int16_t length = lengthBits / 8;
+  data.COMMS_LENGTH = length;
+  return length;
 }
 
 /*
