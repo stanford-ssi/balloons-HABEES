@@ -30,7 +30,7 @@ public:
   void watchdog();
 private:
 /*********************************  OBJECTS  **********************************/
-  double   PIDSetVar;
+  double   PIDSetVar = PID_SETPOINT;
   double   PIDOutVar;
   double   PIDTempVar;
   PID pid;
