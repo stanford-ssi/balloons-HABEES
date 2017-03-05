@@ -30,7 +30,8 @@ static const float     GPS_FENCE_LAT_MAX  =     9999;
 static const float     GPS_FENCE_LON_MIN  =    -9999;
 static const float     GPS_FENCE_LON_MAX  =     9999;
 
-static const uint16_t  COMMS_RATE         =    60000;
+static const uint32_t  COMMS_RATE         =   300000;
+static const uint32_t  COMMS_DEBUG_RATE   =    60000;
 static const uint16_t  WATCHDOG_RATE      =      200;
 static const uint16_t  LOOP_RATE          =       50;
 
