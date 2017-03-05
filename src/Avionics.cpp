@@ -232,7 +232,7 @@ bool Avionics::sendAPRS() {
  * This function parses the command received from the RockBLOCK.
  */
 void Avionics::parseCommand(int16_t len) {
-  if(strncmp(COMMS_BUFFER, CUTDOWN_COMAND, len)) {
+  if(strncmp(COMMS_BUFFER, CUTDOWN_COMAND, len) == 0) {
     data.SHOULD_CUTDOWN = true;
   }
 }
