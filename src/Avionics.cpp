@@ -487,10 +487,6 @@ int16_t Avionics::compressData() {
   int16_t lengthBits  = 0;
   int16_t lengthBytes = 0;
   for(uint16_t i = 0; i < BUFFER_SIZE; i++) COMMS_BUFFER[i] = 0;
-  for(uint16_t i = 0; i < sizeof(data.TIME); i++) {
-    COMMS_BUFFER[i] = data.TIME[i];
-    lengthBits += 8;
-  }
   lengthBits += compressVariable(data.LOOP_RATE,      0,    1000000, 19, lengthBits);
   lengthBits += compressVariable(data.VOLTAGE,        0,    5,       9,  lengthBits);
   lengthBits += compressVariable(data.CURRENT,        0,    5000,    8,  lengthBits);
@@ -529,7 +525,7 @@ int16_t Avionics::compressVariable(float var, float minimum, float maximum, int1
     bool bit = adc & (1 << i);
     if (bit) COMMS_BUFFER[byteIndex] |= (1 << bitIndex);
     bitIndex -= 1;
-    if (bitIndex == 0) {
+    if (bitIndex < 0) {
       bitIndex = 7;
       byteIndex++;
     }
