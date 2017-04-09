@@ -639,17 +639,19 @@ int16_t Avionics::compressData() {
   lengthBits += 8 - (lengthBits % 8);
   lengthBytes = lengthBits / 8;
   data.COMMS_LENGTH = lengthBytes;
-  for (int16_t i = 0; i < lengthBytes; i++) {
-    uint8_t byte = COMMS_BUFFER[i];
-    (byte & 0x80 ? Serial.print('1') : Serial.print('0'));
-    (byte & 0x40 ? Serial.print('1') : Serial.print('0'));
-    (byte & 0x20 ? Serial.print('1') : Serial.print('0'));
-    (byte & 0x10 ? Serial.print('1') : Serial.print('0'));
-    (byte & 0x08 ? Serial.print('1') : Serial.print('0'));
-    (byte & 0x04 ? Serial.print('1') : Serial.print('0'));
-    (byte & 0x02 ? Serial.print('1') : Serial.print('0'));
-    (byte & 0x01 ? Serial.print('1') : Serial.print('0'));
+  if(data.DEBUG_STATE) {
+    for (int16_t i = 0; i < lengthBytes; i++) {
+      uint8_t byte = COMMS_BUFFER[i];
+      (byte & 0x80 ? Serial.print('1') : Serial.print('0'));
+      (byte & 0x40 ? Serial.print('1') : Serial.print('0'));
+      (byte & 0x20 ? Serial.print('1') : Serial.print('0'));
+      (byte & 0x10 ? Serial.print('1') : Serial.print('0'));
+      (byte & 0x08 ? Serial.print('1') : Serial.print('0'));
+      (byte & 0x04 ? Serial.print('1') : Serial.print('0'));
+      (byte & 0x02 ? Serial.print('1') : Serial.print('0'));
+      (byte & 0x01 ? Serial.print('1') : Serial.print('0'));
+    }
+    Serial.print('\n');
   }
-  Serial.print('\n');
   return lengthBytes;
 }
