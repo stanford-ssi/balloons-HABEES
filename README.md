@@ -34,6 +34,8 @@ The avionics flight software was written in compliance with NASA JPL's  Safety-C
 
 `Hardware` - Interface to PCB mechatronics.
 
+`Parser` - Decompression algorithm for satcomms.
+
 # Implementation Details:
 Here is the current status of the code:
 
