@@ -1,6 +1,6 @@
 /*
   Stanford Student Space Initiative
-  Balloons | HABEES | February 2017
+  Balloons | HABEES | April 2017
   Davy Ragland | dragland@stanford.edu
 
   File: Hardware.cpp
@@ -52,7 +52,7 @@ void Hardware::writeLED(uint8_t pinNum, bool green) {
  */
 void Hardware::faultLED() {
   digitalWrite(FAULT_PIN, HIGH);
-  delay(LOOP_RATE);
+  delay(LOOP_INTERVAL);
   digitalWrite(FAULT_PIN, LOW);
 }
 

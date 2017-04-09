@@ -1,6 +1,6 @@
 /*
   Stanford Student Space Initiative
-  Balloons | HABEES | March 2017
+  Balloons | HABEES | APRIL 2017
   Davy Ragland | dragland@stanford.edu
   Joan Creus-Costa | jcreus@stanford.edu
 
@@ -21,10 +21,7 @@ void Avionics::init() {
   PCB.init();
   Serial.begin(CONSOLE_BAUD);
   watchdog();
-  printHeader();
-  if(!SD.begin(SD_CS)) PCB.faultLED();
-  setupLog();
-  logHeader();
+  if(!setupSDCard())      logAlert("unable to setup SD Card", true);
   if(!sensors.init())     logAlert("unable to initialize Sensors", true);
   if(!gpsModule.init())   logAlert("unable to initialize GPS", true);
   if(!RBModule.init())    logAlert("unable to initialize RockBlock", true);
@@ -86,8 +83,8 @@ void Avionics::logState() {
  * This function sends the current data frame down.
  */
 void Avionics::sendComms() {
-  if(data.DEBUG_STATE && ((millis() - data.COMMS_LAST) < COMMS_DEBUG_RATE)) return;
-  if(!data.DEBUG_STATE && ((millis() - data.COMMS_LAST) < COMMS_RATE)) return;
+  if(data.DEBUG_STATE && ((millis() - data.COMMS_LAST) < COMMS_DEBUG_INTERVAL)) return;
+  if(!data.DEBUG_STATE && ((millis() - data.COMMS_LAST) < COMMS_INTERVAL)) return;
   if(compressData() < 0) logAlert("unable to compress Data", true);
   if(!sendSATCOMS()) logAlert("unable to communicate over RB", true);
   // if(!sendAPRS()) logAlert("unable to communicate over APRS", true);
@@ -101,7 +98,8 @@ void Avionics::sendComms() {
  * This function sleeps at the end of the loop.
  */
 void Avionics::sleep() {
-  gpsModule.smartDelay(LOOP_RATE);
+  uint32_t loopTime = millis() - data.LOOP_START;
+  if (loopTime < LOOP_INTERVAL) gpsModule.smartDelay(LOOP_INTERVAL - loopTime);
   watchdog();
 }
 
@@ -121,9 +119,23 @@ bool Avionics::finishedSetup() {
  * This function pulses the watchdog IC in order to ensure that avionics recovers from a fatal crash.
  */
 void Avionics::watchdog() {
-  if((millis() - data.WATCHDOG_LAST) < WATCHDOG_RATE) return;
+  if((millis() - data.WATCHDOG_LAST) < WATCHDOG_INTERVAL) return;
   PCB.watchdog();
   data.WATCHDOG_LAST = millis();
+}
+
+/*
+ * Function: setupSDCard
+ * -------------------
+ * This function sets up the SD card for logging.
+ */
+bool Avionics::setupSDCard() {
+  bool success = false;
+  printHeader();
+  if(SD.begin(SD_CS)) success = true;
+  setupLog();
+  logHeader();
+  return success;
 }
 
 /*
@@ -134,22 +146,78 @@ void Avionics::watchdog() {
 bool Avionics::readData() {
   sprintf(data.TIME, "%s", sensors.getTime());
   data.LOOP_GOOD_STATE = !data.LOOP_GOOD_STATE;
-  data.LOOP_RATE       = millis() - data.LOOP_START;
+  data.LOOP_TIME       = millis() - data.LOOP_START;
   data.LOOP_START      = millis();
-  data.ALTITUDE_LAST   = data.ALTITUDE_BMP;
+  data.ALTITUDE_LAST   = data.ALTITUDE;
   data.VOLTAGE         = sensors.getVoltage();
   data.CURRENT         = sensors.getCurrent();
   data.TEMP_EXT        = sensors.getTempOut();
   data.TEMP_IN         = sensors.getTempIn();
-  data.PRESS_BMP       = sensors.getPressure();
-  data.ALTITUDE_BMP    = sensors.getAltitude();
+  data.PRESS           = sensors.getPressure();
+  data.ALTITUDE        = sensors.getAltitude();
   data.ASCENT_RATE     = sensors.getAscentRate();
+  if ((millis() - data.GPS_LAST) >= GPS_INTERVAL) readGPS();
+  return true;
+}
+
+/*
+ * Function: readGPS
+ * -------------------
+ * This function reads data from the GPS module.
+ */
+bool Avionics::readGPS() {
+  gpsModule.smartDelay(GPS_LOCK_TIME);
   data.LAT_GPS         = gpsModule.getLatitude();
   data.LONG_GPS        = gpsModule.getLongitude();
   data.ALTITUDE_GPS    = gpsModule.getAltitude();
   data.HEADING_GPS     = gpsModule.getCourse();
   data.SPEED_GPS       = gpsModule.getSpeed();
   data.NUM_SATS_GPS    = gpsModule.getSats();
+  data.GPS_LAST        = millis();
+  return true;
+}
+
+/*
+ * Function: calcVitals
+ * -------------------
+ * This function calculates if the current state is within bounds.
+ */
+bool Avionics::calcVitals() {
+  data.BAT_GOOD_STATE  = (data.VOLTAGE >= 3.63);
+  data.CURR_GOOD_STATE = (data.CURRENT > -5.0 && data.CURRENT <= 500.0);
+  data.PRES_GOOD_STATE = (data.ALTITUDE > -50 && data.ALTITUDE < 200);
+  data.TEMP_GOOD_STATE = (data.TEMP_IN > 15 && data.TEMP_IN < 50);
+  data.GPS_GOOD_STATE  = (data.LAT_GPS != 1000.0 && data.LAT_GPS != 0.0 && data.LONG_GPS != 1000.0 && data.LONG_GPS != 0.0);
+  return true;
+}
+
+/*
+ * Function: calcDebug
+ * -------------------
+ * This function calculates if the avionics is in debug mode.
+ */
+bool Avionics::calcDebug() {
+  if(data.DEBUG_STATE   && (data.ALTITUDE_LAST >= DEBUG_ALT) && (data.ALTITUDE >= DEBUG_ALT)) {
+    data.DEBUG_STATE = false;
+  }
+  return true;
+}
+
+/*
+ * Function: calcCutdown
+ * -------------------
+ * This function calculates if the avionics should cutdown.
+ */
+bool Avionics::calcCutdown() {
+  if(CUTDOWN_GPS_ENABLE && data.GPS_GOOD_STATE &&
+    (((data.LAT_GPS < GPS_FENCE_LAT_MIN) || (data.LAT_GPS > GPS_FENCE_LAT_MAX)) ||
+    ((data.LONG_GPS < GPS_FENCE_LON_MIN) || (data.LONG_GPS > GPS_FENCE_LON_MAX)))
+  ) data.SHOULD_CUTDOWN  = true;
+
+  if(CUTDOWN_ALT_ENABLE && !data.CUTDOWN_STATE &&
+    (data.ALTITUDE_LAST >= CUTDOWN_ALT) &&
+    (data.ALTITUDE      >= CUTDOWN_ALT)
+  ) data.SHOULD_CUTDOWN  = true;
   return true;
 }
 
@@ -197,6 +265,18 @@ bool Avionics::sendCAN() {
 }
 
 /*
+ * Function: sendAPRS
+ * -------------------
+ * This function sends the current data frame over the APRS RF IO.
+ */
+bool Avionics::sendAPRS() {
+  logAlert("sending APRS message", false);
+  if (radioModule.sendAdditionalData(COMMS_BUFFER, data.COMMS_LENGTH) < 0) return false;
+  if (radioModule.sendPacket(data.TIME, data.LAT_GPS, data.LONG_GPS, data.ALTITUDE_LAST, data.HEADING_GPS, data.SPEED_GPS, data.DEBUG_STATE) < 0) return false;
+  return true;
+}
+
+/*
  * Function: sendSATCOMS
  * -------------------
  * This function sends the current data frame over the ROCKBLOCK IO.
@@ -215,18 +295,6 @@ bool Avionics::sendSATCOMS() {
 }
 
 /*
- * Function: sendAPRS
- * -------------------
- * This function sends the current data frame over the APRS RF IO.
- */
-bool Avionics::sendAPRS() {
-  logAlert("sending APRS message", false);
-  if (radioModule.sendAdditionalData(COMMS_BUFFER, data.COMMS_LENGTH) < 0) return false;
-  if (radioModule.sendPacket(data.TIME, data.LAT_GPS, data.LONG_GPS, data.ALTITUDE_LAST, data.HEADING_GPS, data.SPEED_GPS, data.DEBUG_STATE) < 0) return false;
-  return true;
-}
-
-/*
  * Function: parseCommand
  * -------------------
  * This function parses the command received from the RockBLOCK.
@@ -235,50 +303,6 @@ void Avionics::parseCommand(int16_t len) {
   if(strncmp(COMMS_BUFFER, CUTDOWN_COMAND, len) == 0) {
     data.SHOULD_CUTDOWN = true;
   }
-}
-
-/*
- * Function: calcVitals
- * -------------------
- * This function calculates if the current state is within bounds.
- */
-bool Avionics::calcVitals() {
-  data.BAT_GOOD_STATE  = (data.VOLTAGE >= 3.63);
-  data.CURR_GOOD_STATE = (data.CURRENT > -5.0 && data.CURRENT <= 500.0);
-  data.PRES_GOOD_STATE = (data.ALTITUDE_BMP > -50 && data.ALTITUDE_BMP < 200);
-  data.TEMP_GOOD_STATE = (data.TEMP_IN > 15 && data.TEMP_IN < 50);
-  data.GPS_GOOD_STATE  = (data.LAT_GPS != 1000.0 && data.LAT_GPS != 0.0 && data.LONG_GPS != 1000.0 && data.LONG_GPS != 0.0);
-  return true;
-}
-
-/*
- * Function: calcDebug
- * -------------------
- * This function calculates if the avionics is in debug mode.
- */
-bool Avionics::calcDebug() {
-  if(data.DEBUG_STATE   && (data.ALTITUDE_LAST >= DEBUG_ALT) && (data.ALTITUDE_BMP >= DEBUG_ALT)) {
-    data.DEBUG_STATE = false;
-  }
-  return true;
-}
-
-/*
- * Function: calcCutdown
- * -------------------
- * This function calculates if the avionics should cutdown.
- */
-bool Avionics::calcCutdown() {
-  if(CUTDOWN_GPS_ENABLE && data.GPS_GOOD_STATE &&
-    (((data.LAT_GPS < GPS_FENCE_LAT_MIN) || (data.LAT_GPS > GPS_FENCE_LAT_MAX)) ||
-    ((data.LONG_GPS < GPS_FENCE_LON_MIN) || (data.LONG_GPS > GPS_FENCE_LON_MAX)))
-  ) data.SHOULD_CUTDOWN  = true;
-
-  if(CUTDOWN_ALT_ENABLE && !data.CUTDOWN_STATE &&
-    (data.ALTITUDE_LAST >= CUTDOWN_ALT) &&
-    (data.ALTITUDE_BMP  >= CUTDOWN_ALT)
-  ) data.SHOULD_CUTDOWN  = true;
-  return true;
 }
 
 /*
@@ -423,37 +447,71 @@ int16_t Avionics::compressVariable(float var, float minimum, float maximum, int1
 void Avionics::printState() {
   Serial.print(data.TIME);
   Serial.print(',');
-  Serial.print(data.LOOP_RATE);
+  Serial.print(data.LAT_GPS, 4);
   Serial.print(',');
-  Serial.print(data.VOLTAGE);
+  Serial.print(data.LONG_GPS, 4);
   Serial.print(',');
-  Serial.print(data.CURRENT);
+  Serial.print(data.ALTITUDE);
   Serial.print(',');
-  Serial.print(data.ALTITUDE_BMP);
+  Serial.print(data.ALTITUDE_GPS);
   Serial.print(',');
   Serial.print(data.ASCENT_RATE);
+  Serial.print(',');
+  Serial.print(data.CUTDOWN_STATE);
+  Serial.print(',');
+  Serial.print(data.PRESS);
   Serial.print(',');
   Serial.print(data.TEMP_IN);
   Serial.print(',');
   Serial.print(data.TEMP_EXT);
   Serial.print(',');
-  Serial.print(data.LAT_GPS, 4);
+  Serial.print(data.VOLTAGE);
   Serial.print(',');
-  Serial.print(data.LONG_GPS, 4);
+  Serial.print(data.CURRENT);
   Serial.print(',');
   Serial.print(data.SPEED_GPS);
   Serial.print(',');
   Serial.print(data.HEADING_GPS);
   Serial.print(',');
-  Serial.print(data.ALTITUDE_GPS);
-  Serial.print(',');
-  Serial.print(data.PRESS_BMP);
-  Serial.print(',');
   Serial.print(data.NUM_SATS_GPS);
+  Serial.print(',');
+  Serial.print(data.LOOP_TIME);
   Serial.print(',');
   Serial.print(data.RB_SENT_COMMS);
   Serial.print(',');
-  Serial.print(data.CUTDOWN_STATE);
+  Serial.print(data.SHOULD_CUTDOWN);
+  Serial.print(',');
+  Serial.print(data.SETUP_STATE);
+  Serial.print(',');
+  Serial.print(data.DEBUG_STATE);
+  Serial.print(',');
+  Serial.print(data.BAT_GOOD_STATE);
+  Serial.print(',');
+  Serial.print(data.CURR_GOOD_STATE);
+  Serial.print(',');
+  Serial.print(data.PRES_GOOD_STATE);
+  Serial.print(',');
+  Serial.print(data.TEMP_GOOD_STATE);
+  Serial.print(',');
+  Serial.print(data.CAN_GOOD_STATE);
+  Serial.print(',');
+  Serial.print(data.RB_GOOD_STATE);
+  Serial.print(',');
+  Serial.print(data.GPS_GOOD_STATE);
+  Serial.print(',');
+  Serial.print(data.LOOP_GOOD_STATE);
+  Serial.print(',');
+  Serial.print(data.ALTITUDE_LAST);
+  Serial.print(',');
+  Serial.print(data.GPS_LAST);
+  Serial.print(',');
+  Serial.print(data.COMMS_LAST);
+  Serial.print(',');
+  Serial.print(data.WATCHDOG_LAST);
+  Serial.print(',');
+  Serial.print(data.LOOP_START);
+  Serial.print(',');
+  Serial.print(data.COMMS_LENGTH);
   Serial.print('\n');
 }
 
@@ -466,37 +524,71 @@ bool Avionics::logData() {
   bool sucess = true;
   dataFile.print(data.TIME);
   dataFile.print(',');
-  dataFile.print(data.LOOP_RATE);
+  dataFile.print(data.LAT_GPS, 4);
   dataFile.print(',');
-  dataFile.print(data.VOLTAGE);
+  dataFile.print(data.LONG_GPS, 4);
   dataFile.print(',');
-  dataFile.print(data.CURRENT);
+  dataFile.print(data.ALTITUDE);
   dataFile.print(',');
-  dataFile.print(data.ALTITUDE_BMP);
+  dataFile.print(data.ALTITUDE_GPS);
   dataFile.print(',');
   dataFile.print(data.ASCENT_RATE);
+  dataFile.print(',');
+  dataFile.print(data.CUTDOWN_STATE);
+  dataFile.print(',');
+  dataFile.print(data.PRESS);
   dataFile.print(',');
   dataFile.print(data.TEMP_IN);
   dataFile.print(',');
   dataFile.print(data.TEMP_EXT);
   dataFile.print(',');
-  dataFile.print(data.LAT_GPS, 4);
+  dataFile.print(data.VOLTAGE);
   dataFile.print(',');
-  dataFile.print(data.LONG_GPS, 4);
+  dataFile.print(data.CURRENT);
   dataFile.print(',');
   dataFile.print(data.SPEED_GPS);
   dataFile.print(',');
   dataFile.print(data.HEADING_GPS);
   dataFile.print(',');
-  dataFile.print(data.ALTITUDE_GPS);
-  dataFile.print(',');
-  dataFile.print(data.PRESS_BMP);
-  dataFile.print(',');
   dataFile.print(data.NUM_SATS_GPS);
   dataFile.print(',');
+  dataFile.print(data.LOOP_TIME);
+  dataFile.print(',');
   dataFile.print(data.RB_SENT_COMMS);
-  if(dataFile.print(',') != 1) sucess = false;
-  dataFile.print(data.CUTDOWN_STATE);
+  dataFile.print(',');
+  dataFile.print(data.SHOULD_CUTDOWN);
+  dataFile.print(',');
+  dataFile.print(data.SETUP_STATE);
+  dataFile.print(',');
+  dataFile.print(data.DEBUG_STATE);
+  dataFile.print(',');
+  dataFile.print(data.BAT_GOOD_STATE);
+  dataFile.print(',');
+  dataFile.print(data.CURR_GOOD_STATE);
+  dataFile.print(',');
+  dataFile.print(data.PRES_GOOD_STATE);
+  dataFile.print(',');
+  dataFile.print(data.TEMP_GOOD_STATE);
+  dataFile.print(',');
+  dataFile.print(data.CAN_GOOD_STATE);
+  dataFile.print(',');
+  dataFile.print(data.RB_GOOD_STATE);
+  dataFile.print(',');
+  dataFile.print(data.GPS_GOOD_STATE);
+  dataFile.print(',');
+  dataFile.print(data.LOOP_GOOD_STATE);
+  dataFile.print(',');
+  dataFile.print(data.ALTITUDE_LAST);
+  dataFile.print(',');
+  dataFile.print(data.GPS_LAST);
+  dataFile.print(',');
+  dataFile.print(data.COMMS_LAST);
+  dataFile.print(',');
+  dataFile.print(data.WATCHDOG_LAST);
+  dataFile.print(',');
+  dataFile.print(data.LOOP_START);
+    if(dataFile.print(',') != 1) sucess = false;
+  dataFile.print(data.COMMS_LENGTH);
   dataFile.print('\n');
   dataFile.flush();
   return sucess;
@@ -511,22 +603,39 @@ int16_t Avionics::compressData() {
   int16_t lengthBits  = 0;
   int16_t lengthBytes = 0;
   for(uint16_t i = 0; i < BUFFER_SIZE; i++) COMMS_BUFFER[i] = 0;
-  lengthBits += compressVariable(data.LOOP_RATE,      0,    10000,   10, lengthBits);
-  lengthBits += compressVariable(data.VOLTAGE,        0,    5,       9,  lengthBits);
-  lengthBits += compressVariable(data.CURRENT,        0,    5000,    8,  lengthBits);
-  lengthBits += compressVariable(data.ALTITUDE_BMP,  -2000, 40000,   16, lengthBits);
-  lengthBits += compressVariable(data.ASCENT_RATE,   -10,   10,      11, lengthBits);
-  lengthBits += compressVariable(data.TEMP_IN,       -50,   100,     9,  lengthBits);
-  lengthBits += compressVariable(data.TEMP_EXT,      -100,  100,     9,  lengthBits);
-  lengthBits += compressVariable(data.LAT_GPS,       -90,   90,      21, lengthBits);
-  lengthBits += compressVariable(data.LONG_GPS,      -180,  180,     22, lengthBits);
-  lengthBits += compressVariable(data.SPEED_GPS,     -100,  100,     9,  lengthBits);
-  lengthBits += compressVariable(data.HEADING_GPS,   -2000, 40000,   16, lengthBits);
-  lengthBits += compressVariable(data.ALTITUDE_GPS,  -2000, 40000,   16, lengthBits);
-  lengthBits += compressVariable(data.PRESS_BMP,      0,    500000,  19, lengthBits);
-  lengthBits += compressVariable(data.NUM_SATS_GPS,   0,    25,      4,  lengthBits);
-  lengthBits += compressVariable(data.RB_SENT_COMMS,  0,    8191,    13, lengthBits);
-  lengthBits += compressVariable(data.CUTDOWN_STATE,  0,    1,       1,  lengthBits);
+  lengthBits += compressVariable(data.LAT_GPS,                         -90,   90,      21, lengthBits);
+  lengthBits += compressVariable(data.LONG_GPS,                        -180,  180,     22, lengthBits);
+  lengthBits += compressVariable(data.ALTITUDE,                        -2000, 40000,   16, lengthBits);
+  lengthBits += compressVariable(data.ALTITUDE_GPS,                    -2000, 40000,   16, lengthBits);
+  lengthBits += compressVariable(data.ASCENT_RATE,                     -10,   10,      11, lengthBits);
+  lengthBits += compressVariable(data.CUTDOWN_STATE,                    0,    1,       1,  lengthBits);
+  lengthBits += compressVariable(data.PRESS,                            0,    500000,  19, lengthBits);
+  lengthBits += compressVariable(data.TEMP_IN,                         -50,   100,     9,  lengthBits);
+  lengthBits += compressVariable(data.TEMP_EXT,                        -50,   100,     9,  lengthBits);
+  lengthBits += compressVariable(data.VOLTAGE,                          0,    5,       9,  lengthBits);
+  lengthBits += compressVariable(data.CURRENT,                          0,    5000,    8,  lengthBits);
+  lengthBits += compressVariable(data.SPEED_GPS,                       -100,  100,     9,  lengthBits);
+  lengthBits += compressVariable(data.HEADING_GPS,                     -2000, 40000,   16, lengthBits);
+  lengthBits += compressVariable(data.NUM_SATS_GPS,                     0,    25,      4,  lengthBits);
+  lengthBits += compressVariable(data.LOOP_TIME,                        0,    10000,   10, lengthBits);
+  lengthBits += compressVariable(data.RB_SENT_COMMS,                    0,    8191,    13, lengthBits);
+  lengthBits += compressVariable(data.SHOULD_CUTDOWN,                   0,    1,       1,  lengthBits);
+  lengthBits += compressVariable(data.SETUP_STATE,                      0,    1,       1,  lengthBits);
+  lengthBits += compressVariable(data.DEBUG_STATE,                      0,    1,       1,  lengthBits);
+  lengthBits += compressVariable(data.BAT_GOOD_STATE,                   0,    1,       1,  lengthBits);
+  lengthBits += compressVariable(data.CURR_GOOD_STATE,                  0,    1,       1,  lengthBits);
+  lengthBits += compressVariable(data.PRES_GOOD_STATE,                  0,    1,       1,  lengthBits);
+  lengthBits += compressVariable(data.TEMP_GOOD_STATE,                  0,    1,       1,  lengthBits);
+  lengthBits += compressVariable(data.CAN_GOOD_STATE,                   0,    1,       1,  lengthBits);
+  lengthBits += compressVariable(data.RB_GOOD_STATE,                    0,    1,       1,  lengthBits);
+  lengthBits += compressVariable(data.GPS_GOOD_STATE,                   0,    1,       1,  lengthBits);
+  lengthBits += compressVariable(data.LOOP_GOOD_STATE,                  0,    1,       1,  lengthBits);
+  lengthBits += compressVariable(data.ALTITUDE_LAST,                   -2000, 40000,   16, lengthBits);
+  lengthBits += compressVariable(data.GPS_LAST,                         0,    500000,  19, lengthBits);
+  lengthBits += compressVariable(data.COMMS_LAST,                       0,    500000,  19, lengthBits);
+  lengthBits += compressVariable(data.WATCHDOG_LAST,                    0,    500000,  19, lengthBits);
+  lengthBits += compressVariable(data.LOOP_START / 1000,                0,    3000000, 20, lengthBits);
+  lengthBits += compressVariable(data.COMMS_LENGTH,                     0,    200,     8,  lengthBits);
   lengthBits += 8 - (lengthBits % 8);
   lengthBytes = lengthBits / 8;
   data.COMMS_LENGTH = lengthBytes;
@@ -541,5 +650,6 @@ int16_t Avionics::compressData() {
     (x & 0x02 ? Serial.print('1') : Serial.print('0'));
     (x & 0x01 ? Serial.print('1') : Serial.print('0'));
   }
+  Serial.print('\n');
   return lengthBytes;
 }

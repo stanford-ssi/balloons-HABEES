@@ -1,6 +1,6 @@
 /*
   Stanford Student Space Initiative
-  Balloons | HABEES | March 2017
+  Balloons | HABEES | APRIL 2017
   Davy Ragland | dragland@stanford.edu
 
   File: avionics.h
@@ -31,8 +31,7 @@ public:
     gpsModule(GPS_ENABLE, GPS_BAUD, GPS_LOCK_TIME),
     canModule(CAN_ENABLE, CAN_BAUD),
     RBModule(RB_SLEEP, RB_BAUD),
-    radioModule(DRA_TX, DRA_RX, DRA_PTT, DRA_MIC, DRA_ENABLE, DRA_PWR, DRA_SLEEP
-      , TARGET_CALLSIGN, TARGET_DESIG, TX_CALLSIGN, MISSION_NUMBER) {
+    radioModule(DRA_TX, DRA_RX, DRA_PTT, DRA_MIC, DRA_ENABLE, DRA_PWR, DRA_SLEEP, TARGET_CALLSIGN, TARGET_DESIG, TX_CALLSIGN, MISSION_NUMBER) {
   }
   void    init();
 /********************************  FUNCTIONS  *********************************/
@@ -47,26 +46,33 @@ public:
 private:
 /*********************************  HELPERS  **********************************/
   void    watchdog();
+  bool    setupSDCard();
+
   bool    readData();
-  bool    runHeaters();
-  bool    runCutdown();
-  bool    sendCAN();
-  bool    sendSATCOMS();
-  bool    sendAPRS();
-  void    parseCommand(int16_t len);
+  bool    readGPS();
+
   bool    calcVitals();
   bool    calcDebug();
   bool    calcCutdown();
+
+  bool    runHeaters();
+  bool    runCutdown();
+
+  bool    sendCAN();
+  bool    sendAPRS();
+  bool    sendSATCOMS();
+  void    parseCommand(int16_t len);
+
   bool    debugState();
   void    displayState();
   void    setupLog();
   void    printHeader();
   void    logHeader();
   void    logAlert(const char*, bool fatal);
-  int16_t compressData();
+  int16_t compressVariable(float var, float minimum, float maximum, int16_t resolution, int16_t length);
   void    printState();
   bool    logData();
-  int16_t compressVariable(float var, float minimum, float maximum, int16_t resolution, int16_t length);
+  int16_t compressData();
 /*********************************  OBJECTS  **********************************/
   char COMMS_BUFFER[BUFFER_SIZE];
   DataFrame data;
