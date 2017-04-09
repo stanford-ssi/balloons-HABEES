@@ -28,8 +28,8 @@ void Avionics::init() {
   if(!sensors.init())     logAlert("unable to initialize Sensors", true);
   if(!gpsModule.init())   logAlert("unable to initialize GPS", true);
   if(!RBModule.init())    logAlert("unable to initialize RockBlock", true);
-  if(!radioModule.init()) logAlert("unable to initialize radio", true);
-  if(!canModule.init())   logAlert("unable to initialize CAN BUS", true);
+  // if(!radioModule.init()) logAlert("unable to initialize radio", true);
+  // if(!canModule.init())   logAlert("unable to initialize CAN BUS", true);
   watchdog();
   data.SETUP_STATE = false;
 }
@@ -392,6 +392,30 @@ void Avionics::logAlert(const char* debug, bool fatal) {
 }
 
 /*
+ * Function: compressVariable
+ * -------------------
+ * This function compresses a single variable into a scaled digital bitmask.
+ */
+int16_t Avionics::compressVariable(float var, float minimum, float maximum, int16_t resolution, int16_t length) {
+  if (resolution <= 0) return -1;
+  if (var < minimum) var = minimum;
+  if (var > maximum) var = maximum;
+  int32_t adc = round( (pow(2, resolution) - 1) * (var - minimum) / (maximum - minimum));
+  int16_t byteIndex = length / 8;
+  int16_t bitIndex = 7 - (length % 8);
+  for (int16_t i = resolution - 1; i >= 0; i--) {
+    bool bit = adc & (1 << i);
+    if (bit) COMMS_BUFFER[byteIndex] |= (1 << bitIndex);
+    bitIndex -= 1;
+    if (bitIndex < 0) {
+      bitIndex = 7;
+      byteIndex++;
+    }
+  }
+  return resolution;
+}
+
+/*
  * Function: printState
  * -------------------
  * This function prints the current avionics state.
@@ -487,7 +511,7 @@ int16_t Avionics::compressData() {
   int16_t lengthBits  = 0;
   int16_t lengthBytes = 0;
   for(uint16_t i = 0; i < BUFFER_SIZE; i++) COMMS_BUFFER[i] = 0;
-  lengthBits += compressVariable(data.LOOP_RATE,      0,    1000000, 19, lengthBits);
+  lengthBits += compressVariable(data.LOOP_RATE,      0,    10000,   10, lengthBits);
   lengthBits += compressVariable(data.VOLTAGE,        0,    5,       9,  lengthBits);
   lengthBits += compressVariable(data.CURRENT,        0,    5000,    8,  lengthBits);
   lengthBits += compressVariable(data.ALTITUDE_BMP,  -2000, 40000,   16, lengthBits);
@@ -499,36 +523,23 @@ int16_t Avionics::compressData() {
   lengthBits += compressVariable(data.SPEED_GPS,     -100,  100,     9,  lengthBits);
   lengthBits += compressVariable(data.HEADING_GPS,   -2000, 40000,   16, lengthBits);
   lengthBits += compressVariable(data.ALTITUDE_GPS,  -2000, 40000,   16, lengthBits);
-  lengthBits += compressVariable(data.PRESS_BMP,      0,    1000000, 19, lengthBits);
-  lengthBits += compressVariable(data.NUM_SATS_GPS,   0,    10,      11, lengthBits);
-  lengthBits += compressVariable(data.RB_SENT_COMMS,  0,    1000000, 19, lengthBits);
+  lengthBits += compressVariable(data.PRESS_BMP,      0,    500000,  19, lengthBits);
+  lengthBits += compressVariable(data.NUM_SATS_GPS,   0,    25,      4,  lengthBits);
+  lengthBits += compressVariable(data.RB_SENT_COMMS,  0,    8191,    13, lengthBits);
   lengthBits += compressVariable(data.CUTDOWN_STATE,  0,    1,       1,  lengthBits);
   lengthBits += 8 - (lengthBits % 8);
   lengthBytes = lengthBits / 8;
   data.COMMS_LENGTH = lengthBytes;
-  return lengthBytes;
-}
-
-/*
- * Function: compressVariable
- * -------------------
- * This function compresses a single variable into a scaled digital bitmask.
- */
-int16_t Avionics::compressVariable(float var, float minimum, float maximum, int16_t resolution, int16_t length) {
-  if (resolution <= 0) return -1;
-  if (var < minimum) var = minimum;
-  if (var > maximum) var = maximum;
-  int32_t adc = round( (pow(2, resolution) - 1) * (var - minimum) / (maximum - minimum));
-  int16_t byteIndex = length / 8;
-  int16_t bitIndex = 7 - (length % 8);
-  for (int16_t i = resolution - 1; i >= 0; i--) {
-    bool bit = adc & (1 << i);
-    if (bit) COMMS_BUFFER[byteIndex] |= (1 << bitIndex);
-    bitIndex -= 1;
-    if (bitIndex < 0) {
-      bitIndex = 7;
-      byteIndex++;
-    }
+  for (int16_t i = 0; i < lengthBytes; i++) {
+    uint8_t x = COMMS_BUFFER[i];
+    (x & 0x80 ? Serial.print('1') : Serial.print('0'));
+    (x & 0x40 ? Serial.print('1') : Serial.print('0'));
+    (x & 0x20 ? Serial.print('1') : Serial.print('0'));
+    (x & 0x10 ? Serial.print('1') : Serial.print('0'));
+    (x & 0x08 ? Serial.print('1') : Serial.print('0'));
+    (x & 0x04 ? Serial.print('1') : Serial.print('0'));
+    (x & 0x02 ? Serial.print('1') : Serial.print('0'));
+    (x & 0x01 ? Serial.print('1') : Serial.print('0'));
   }
-  return resolution;
+  return lengthBytes;
 }
