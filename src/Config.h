@@ -52,7 +52,7 @@ static const char      CSV_DATA_HEADER[]             =                 "TIME,LOO
 static const bool      CUTDOWN_ALT_ENABLE            =                     true;
 static const bool      CUTDOWN_GPS_ENABLE            =                     true;
 static const uint16_t  CUTDOWN_ALT                   =                    20000;
-static const uint16_t  CUTDOWN_TIME                  =                     5000;
+static const uint16_t  CUTDOWN_TIME                  =                    10000;
 
 static const uint16_t  GPS_LOCK_TIME                 =                      500;
 static const float     GPS_FENCE_LAT_MIN             =                    -9999;
