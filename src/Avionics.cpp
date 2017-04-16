@@ -209,6 +209,7 @@ bool Avionics::calcDebug() {
  * This function calculates if the avionics should cutdown.
  */
 bool Avionics::calcCutdown() {
+  if(data.CUTDOWN_STATE) return true;
   if(CUTDOWN_GPS_ENABLE && data.GPS_GOOD_STATE &&
     (((data.LAT_GPS < GPS_FENCE_LAT_MIN) || (data.LAT_GPS > GPS_FENCE_LAT_MAX)) ||
     ((data.LONG_GPS < GPS_FENCE_LON_MIN) || (data.LONG_GPS > GPS_FENCE_LON_MAX)))
@@ -237,11 +238,11 @@ bool Avionics::runHeaters() {
  * This function cuts down the payload if nessisary.
  */
 bool Avionics::runCutdown() {
-  if(data.CUTDOWN_STATE) return true;
   if(data.SHOULD_CUTDOWN) {
     PCB.cutDown(true);
     gpsModule.smartDelay(CUTDOWN_TIME);
     PCB.cutDown(false);
+    data.SHOULD_CUTDOWN = false;
     data.CUTDOWN_STATE = true;
     logAlert("completed cutdown", false);
   }
