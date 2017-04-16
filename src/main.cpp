@@ -26,6 +26,7 @@ int main(void) {
     HABEES.sendComms();
     HABEES.sleep();
   }
+  return 0;
 }
 /*********************************  CALLBACK  *********************************/
 bool ISBDCallback() {
