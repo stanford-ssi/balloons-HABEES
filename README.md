@@ -1,6 +1,8 @@
 # SSI HABEES:
 ### A modular flight controller with payload interface for high altitude balloons
 
+![alt text](HABEES.jpg "HABEES")
+
 # Flight States:
 The avionics uses an Event Driven model in order to clearly transition between states of operation.
 
